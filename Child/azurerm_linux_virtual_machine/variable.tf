@@ -1,0 +1,2 @@
+variable "VM" {}
+variable "NIC" {}
