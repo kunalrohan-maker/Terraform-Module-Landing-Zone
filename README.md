@@ -1,6 +1,6 @@
 # Terraform-Module-Landing-Zone
 
-Module to create VM in one go
+Module to create VM & Azure Load Balancer in one go
 
 
 
