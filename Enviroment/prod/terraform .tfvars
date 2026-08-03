@@ -12,7 +12,7 @@ RG = {
     RG3 = {
     name    = "Prod_Test"
     loc     = "Australia east"
-    managed = "Kunal"
+    managed = "Ashish"
   }
 }
 
