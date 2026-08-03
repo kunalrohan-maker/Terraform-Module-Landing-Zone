@@ -30,6 +30,7 @@ SN = {
 pip = {
   pip1 = { name = "BastionIP", res = "Dev_Rohan", loc = "Japaneast", allo = "Static" }
   pip2 = {name = "NAT_IP", res = "Dev_Rohan", loc = "Japaneast", allo = "Static"} 
+  pip3 = { name = "frontendIP", res = "Dev_Rohan", loc = "Japaneast", allo = "Static"}
 }
 
 bastion = {
@@ -72,4 +73,25 @@ NIC = {
   sku = "16.04-LTS", version = "latest", NIC_id = "NIC2"}
 
   
+ }
+
+ lb = {
+  lb1 = { name = "LoadBalancer",loc = "Japaneast", res= "Dev_Rohan", frontendIP_config = "Frontend_IP", public_ip_address_id = "pip3"}
+ }
+
+ health = {
+  h1 = { name = "HealthProbe", port = 22, lb_id = "lb1"}
+ }
+
+ backendpool = {
+  pool1 = {name = "Backendpool", lb_id="lb1"}
+ }
+
+ bass = {
+  bass1 = { name = "NIC_Backend_Association", NIC_id = "NIC1", pool_id = "pool1"}
+  bass2 = { name = "NIC_Backend_Association", NIC_id = "NIC2", pool_id = "pool1"}
+ }
+
+ rule = {
+  rule1 = {name = "HTTP", proto = "Tcp", frontendIP_config = "FrontendIP", pool_id = "pool1", probe_id = "h1", lb_id = "lb1"}
  }

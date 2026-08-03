@@ -8,7 +8,10 @@ variable "NAT_Subnet" {}
 variable "NSG" {}
 variable "NIC" {}
 variable "VM" {}
-variable "NAT_pip" {
-  
-}
-  
+variable "NAT_pip" {}
+variable "lb" {}
+variable "health" {}
+variable "backendpool" {}
+variable "bass" {}
+variable "rule" {}
+

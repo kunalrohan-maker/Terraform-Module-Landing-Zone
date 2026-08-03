@@ -75,5 +75,34 @@ module "VM" {
   
 }
 
+module "lb" {
+  source = "../../Child/azurerm_loadbalancer"
+  lb = var.lb
+  pip = var.pip
+  depends_on = [ module.publicIP ]
+  
+}
+
+
+module "Backend" {
+  source = "../../Child/azurerm_backend_pool"
+  backendpool = var.backendpool
+  bass = var.bass
+  lb = var.lb
+  NIC = var.NIC
+  depends_on = [ module.lb ]
+  
+}
+
+module "rule" {
+  source = "../../Child/azurerm_lb_rule"
+  rule = var.rule
+  health = var.health
+  backendpool = var.backendpool
+  lb = var.lb
+  depends_on = [ module.lb, module.Backend ]
+  
+}
+
 
 
