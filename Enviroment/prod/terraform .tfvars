@@ -9,6 +9,11 @@ RG = {
     loc     = "Australia east"
     managed = "Kunal"
   }
+    RG3 = {
+    name    = "Prod_Test"
+    loc     = "Australia east"
+    managed = "Ashish"
+  }
 }
 
 VNET = {
