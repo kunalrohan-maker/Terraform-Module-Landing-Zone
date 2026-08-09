@@ -23,26 +23,26 @@ jobs:
 
       - name: Terraform Init
         run: |
-          cd Enviroment/prod
+          cd Environmentnt/prod
           terraform init
 
       - name: Terraform Format
         run: |
-          cd Enviroment/prod
+          cd Environmentnt/prod
           terraform fmt -recursive -check
 
       - name: Terraform Validate
         run: |
-          cd Enviroment/prod
+          cd Environmentnt/prod
           terraform validate
 
       - name: Terraform Plan
         run: |
-          cd Enviroment/prod
+          cd Environmentnt/prod
           terraform plan -out=tfplan
 
       - name: Upload Plan
         uses: actions/upload-artifact@v4
         with:
           name: terraform-plan
-          path: Enviroment/prod/tfplan
+          path: Environmentnt/prod/tfplan
