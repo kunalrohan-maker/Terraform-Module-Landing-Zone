@@ -1,4 +1,4 @@
-name: Debug GitHub Runner
+name: Terraform Feature Pipeline
 
 on:
   push:
@@ -6,15 +6,45 @@ on:
       - feature
 
 jobs:
-  debug:
+  terraform-plan:
+
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
+
+      - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Show Current Directory
-        run: pwd
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.13.1
 
-      - name: List Repository
-        run: ls -R
+      - name: Terraform Version
+        run: terraform version
+
+      - name: Terraform Init
+        run: |
+          cd Environment/Dev
+          terraform init
+
+      - name: Terraform Format
+        run: |
+          cd Environment/Dev
+          terraform fmt -recursive -check
+
+      - name: Terraform Validate
+        run: |
+          cd Environment/Dev
+          terraform validate
+
+      - name: Terraform Plan
+        run: |
+          cd Environment/Dev
+          terraform plan -out=tfplan
+
+      - name: Upload Plan
+        uses: actions/upload-artifact@v4
+        with:
+          name: terraform-plan
+          path: Environment/Dev/tfplan
