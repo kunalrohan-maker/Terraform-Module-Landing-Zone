@@ -23,7 +23,7 @@ jobs:
 
       - name: Terraform Init
         run: |
-          cd Environmentnt/prod
+          cd Environment/prod
           terraform init
 
       - name: Terraform Format
