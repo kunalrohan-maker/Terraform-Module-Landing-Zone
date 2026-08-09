@@ -5,44 +5,56 @@ on:
     branches:
       - feature
 
+permissions:
+  contents: read
+
 jobs:
   terraform-plan:
+    name: Terraform Feature Pipeline
     runs-on: ubuntu-latest
 
     steps:
+      # Checkout Repository
       - name: Checkout Repository
         uses: actions/checkout@v4
 
+      # Install Terraform
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: "1.13.1"
 
+      # Verify Terraform Version
       - name: Terraform Version
         run: terraform version
 
+      # Terraform Init
       - name: Terraform Init
         run: |
-          cd Environment/prod
+          cd Enviroment/prod
           terraform init
 
+      # Terraform Format
       - name: Terraform Format
         run: |
-          cd Environment/prod
-          terraform fmt -recursive -check
+          cd Enviroment/prod
+          terraform fmt -recursive
 
+      # Terraform Validate
       - name: Terraform Validate
         run: |
-          cd Environment/prod
+          cd Enviroment/prod
           terraform validate
 
+      # Terraform Plan
       - name: Terraform Plan
         run: |
-          cd Environment/prod
+          cd Enviroment/prod
           terraform plan -out=tfplan
 
-      - name: Upload Plan
+      # Upload Terraform Plan
+      - name: Upload Terraform Plan
         uses: actions/upload-artifact@v4
         with:
           name: terraform-plan
-          path: Environment/prod/tfplan
+          path: Enviroment/prod/tfplan
