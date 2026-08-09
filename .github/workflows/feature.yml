@@ -10,39 +10,57 @@ permissions:
 
 jobs:
   terraform-plan:
-    name: Terraform Plan
     runs-on: ubuntu-latest
 
     steps:
+      # Checkout source code
       - name: Checkout Repository
         uses: actions/checkout@v4
 
+      # Install Terraform
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: "1.13.1"
 
-      - name: Terraform Version
+      # Verify Terraform installation
+      - name: Check Terraform Version
         run: terraform version
 
+      # Debug (keep this until pipeline is stable)
+      - name: Show Current Directory
+        run: |
+          pwd
+          ls -la
+          find .
+
+      # Terraform Init
       - name: Terraform Init
-        working-directory: Environment/prod
-        run: terraform init
+        run: |
+          cd $GITHUB_WORKSPACE/Environment/prod
+          terraform init
 
+      # Terraform Format
       - name: Terraform Format
-        working-directory: Environment/prod
-        run: terraform fmt -recursive -check
+        run: |
+          cd $GITHUB_WORKSPACE/Environment/prod
+          terraform fmt -recursive -check
 
+      # Terraform Validate
       - name: Terraform Validate
-        working-directory: Environment/prod
-        run: terraform validate
+        run: |
+          cd $GITHUB_WORKSPACE/Environment/prod
+          terraform validate
 
+      # Terraform Plan
       - name: Terraform Plan
-        working-directory: Environment/prod
-        run: terraform plan -out=tfplan
+        run: |
+          cd $GITHUB_WORKSPACE/Environment/prod
+          terraform plan -out=tfplan
 
+      # Upload tfplan artifact
       - name: Upload Terraform Plan
         uses: actions/upload-artifact@v4
         with:
           name: terraform-plan
-          path: Environment/prod/tfplan
+          path: ${{ github.workspace }}/Environment/prod/tfplan
