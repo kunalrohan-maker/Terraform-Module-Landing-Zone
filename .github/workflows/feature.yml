@@ -13,44 +13,50 @@ jobs:
     name: Terraform Plan
     runs-on: ubuntu-latest
 
-    defaults:
-      run:
-        shell: bash
-        working-directory: Environment/Dev
-
     steps:
 
-      # Step 1 - Checkout Repository
+      # Checkout Repository
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      # Step 2 - Install Terraform
+      # Debug Repository Structure
+      - name: Show Repository Structure
+        run: |
+          pwd
+          ls -la
+          find . -maxdepth 3 -type d
+
+      # Install Terraform
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: 1.13.1
 
-      # Step 3 - Display Terraform Version
+      # Terraform Version
       - name: Terraform Version
         run: terraform version
 
-      # Step 4 - Terraform Init
+      # Terraform Init
       - name: Terraform Init
+        working-directory: ./Environment/Dev
         run: terraform init
 
-      # Step 5 - Terraform Format Check
+      # Terraform Format
       - name: Terraform Format
+        working-directory: ./Environment/Dev
         run: terraform fmt -recursive -check
 
-      # Step 6 - Terraform Validate
+      # Terraform Validate
       - name: Terraform Validate
+        working-directory: ./Environment/Dev
         run: terraform validate
 
-      # Step 7 - Terraform Plan
+      # Terraform Plan
       - name: Terraform Plan
+        working-directory: ./Environment/Dev
         run: terraform plan -out=tfplan
 
-      # Step 8 - Upload Plan File
+      # Upload Plan
       - name: Upload Plan Artifact
         uses: actions/upload-artifact@v4
         with:
