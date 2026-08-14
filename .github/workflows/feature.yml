@@ -41,7 +41,7 @@ jobs:
         run: |
           az account show
 
-      # Terraform Init
+      # Terraform Init (Ini)
       - name: Terraform Init
         working-directory: Environment/prod
         run: |
