@@ -27,15 +27,16 @@ jobs:
         run: terraform version
 
       # Azure Authentication
+          # Azure Authentication
       - name: Azure Login
         uses: azure/login@v2
         with:
-          client-id: ${{ 34878fb5-d326-48b0-b4cf-269651f4b945 }}
-          tenant-id: ${{ 49d9d716-d5ad-40fa-9707-f8d27b7cd8c8 }}
-          subscription-id: ${{ 990d8adf-a227-429c-918d-352714086c0e }}
-          client-secret: ${{ Vl~8Q~Rhlx_CRhSiNmevf0uJ6ZHBJhgByyfMgbN- }}
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          client-secret: ${{ secrets.AZURE_CLIENT_SECRET }}
 
-      # Verify Azure authentication
+      # Verify Azure Authentication
       - name: Verify Azure Login
         run: |
           az account show
