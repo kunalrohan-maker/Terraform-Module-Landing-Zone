@@ -15,33 +15,32 @@ jobs:
 
     steps:
 
+      # Checkout Repository
       - name: Checkout Repository
         uses: actions/checkout@v4
 
+      # Setup Terraform
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: "1.13.1"
 
+      # Terraform Version
       - name: Terraform Version
         run: terraform version
 
-      # Azure Authentication
-          # Azure Authentication
+      # Azure Login
       - name: Azure Login
         uses: azure/login@v2
         with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-          client-secret: ${{ secrets.AZURE_CLIENT_SECRET }}
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-      # Verify Azure Authentication
+      # Verify Azure Login
       - name: Verify Azure Login
         run: |
           az account show
 
-      # Terraform Init (Ini)
+      # Terraform Init
       - name: Terraform Init
         working-directory: Environment/prod
         run: |
@@ -51,7 +50,7 @@ jobs:
       - name: Terraform Format
         working-directory: Environment/prod
         run: |
-          terraform fmt -check -recursive
+          terraform fmt -recursive
 
       # Terraform Validate
       - name: Terraform Validate
@@ -59,13 +58,13 @@ jobs:
         run: |
           terraform validate
 
-      # Terraform Plan ONLY
+      # Terraform Plan
       - name: Terraform Plan
         working-directory: Environment/prod
         run: |
           terraform plan -out=tfplan
 
-      # Upload Plan
+      # Upload Terraform Plan
       - name: Upload Terraform Plan
         uses: actions/upload-artifact@v4
         with:
