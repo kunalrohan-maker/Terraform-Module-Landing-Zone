@@ -1,117 +1,124 @@
-name: Terraform CI-CD Pipeline
+name: Terraform CI CD Pipeline
 
 on:
   push:
     branches:
       - feature
 
+# Required to allow GitHub Actions to merge feature into main
 permissions:
-  contents: read
+  contents: write
 
 jobs:
 
-  # ==========================================================
+  # ============================================================
   # 1. CONTINUOUS INTEGRATION
-  # ==========================================================
+  # ============================================================
 
   terraform-ci:
-
     name: Terraform CI
-
-    # Self-hosted runner
     runs-on: self-hosted
 
     steps:
 
-      # ------------------------------------------------------
-      # Checkout
-      # ------------------------------------------------------
+      # ----------------------------------------------------------
+      # Checkout Feature Branch
+      # ----------------------------------------------------------
 
       - name: Checkout Repository
         uses: actions/checkout@v4
-
-
-      # ------------------------------------------------------
-      # Setup Terraform
-      # ------------------------------------------------------
-
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3
         with:
-          terraform_version: "1.13.1"
+          fetch-depth: 0
 
+      # ----------------------------------------------------------
+      # Check Runner
+      # ----------------------------------------------------------
 
-      # ------------------------------------------------------
-      # Terraform Version
-      # ------------------------------------------------------
+      - name: Check Runner
+        shell: powershell
+        run: |
+          Write-Host "Operating System:"
+          [System.Environment]::OSVersion.Version
 
-      - name: Terraform Version
+          Write-Host ""
+          Write-Host "Architecture:"
+          $env:PROCESSOR_ARCHITECTURE
+
+      # ----------------------------------------------------------
+      # Check Terraform
+      # ----------------------------------------------------------
+      # IMPORTANT:
+      # No setup-terraform here because your
+      # self-hosted runner is Windows ARM64.
+      # Terraform must already be installed on runner.
+      # ----------------------------------------------------------
+
+      - name: Check Terraform Version
+        shell: powershell
         run: |
           terraform version
 
-
-      # ------------------------------------------------------
+      # ----------------------------------------------------------
       # Azure Login
-      # ------------------------------------------------------
+      # ----------------------------------------------------------
 
       - name: Azure Login
         uses: azure/login@v2
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-
-      # ------------------------------------------------------
+      # ----------------------------------------------------------
       # Verify Azure Login
-      # ------------------------------------------------------
+      # ----------------------------------------------------------
 
       - name: Verify Azure Login
+        shell: powershell
         run: |
           az account show
 
-
-      # ------------------------------------------------------
+      # ----------------------------------------------------------
       # Terraform Init
-      # ------------------------------------------------------
+      # ----------------------------------------------------------
 
       - name: Terraform Init
+        shell: powershell
         working-directory: Environment/prod
         run: |
           terraform init
 
-
-      # ------------------------------------------------------
+      # ----------------------------------------------------------
       # Terraform Format
-      # ------------------------------------------------------
+      # ----------------------------------------------------------
 
       - name: Terraform Format
+        shell: powershell
         working-directory: Environment/prod
         run: |
           terraform fmt -recursive
 
-
-      # ------------------------------------------------------
+      # ----------------------------------------------------------
       # Terraform Validate
-      # ------------------------------------------------------
+      # ----------------------------------------------------------
 
       - name: Terraform Validate
+        shell: powershell
         working-directory: Environment/prod
         run: |
           terraform validate
 
-
-      # ------------------------------------------------------
+      # ----------------------------------------------------------
       # Terraform Plan
-      # ------------------------------------------------------
+      # ----------------------------------------------------------
 
       - name: Terraform Plan
+        shell: powershell
         working-directory: Environment/prod
         run: |
           terraform plan -out=tfplan
 
-
-      # ------------------------------------------------------
+      # ----------------------------------------------------------
       # Upload Terraform Plan
-      # ------------------------------------------------------
+      # ----------------------------------------------------------
 
       - name: Upload Terraform Plan
         uses: actions/upload-artifact@v4
@@ -120,130 +127,176 @@ jobs:
           path: Environment/prod/tfplan
 
 
-  # ==========================================================
-  # 2. PRODUCTION APPROVAL
-  # ==========================================================
+  # ============================================================
+  # 2. AUTOMATIC MERGE
+  # feature → main
+  # ============================================================
 
-  production-approval:
-
-    name: Production Approval
-
-    needs: terraform-ci
-
-    # Same self-hosted runner
+  merge-feature-to-main:
+    name: Merge Feature to Main
     runs-on: self-hosted
 
-    # IMPORTANT:
-    # Configure this environment in:
-    #
-    # Repository
-    #   → Settings
-    #   → Environments
-    #   → production
-    #
-    # Add your collaborator under:
-    # Required reviewers
+    needs:
+      - terraform-ci
 
-    environment:
-      name: production
+    if: success()
 
     steps:
 
-      - name: Approval Received
-        run: |
-          echo "=========================================="
-          echo "Production approval received."
-          echo "CI completed successfully."
-          echo "Starting Production CD."
-          echo "=========================================="
-
-
-  # ==========================================================
-  # 3. CONTINUOUS DEPLOYMENT
-  # ==========================================================
-
-  terraform-cd:
-
-    name: Terraform CD - Production
-
-    needs: production-approval
-
-    # Self-hosted runner
-    runs-on: self-hosted
-
-    steps:
-
-      # ------------------------------------------------------
-      # Checkout Feature Branch
-      # ------------------------------------------------------
+      # ----------------------------------------------------------
+      # Checkout Repository
+      # ----------------------------------------------------------
 
       - name: Checkout Repository
         uses: actions/checkout@v4
-
-
-      # ------------------------------------------------------
-      # Setup Terraform
-      # ------------------------------------------------------
-
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3
         with:
-          terraform_version: "1.13.1"
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      # ----------------------------------------------------------
+      # Configure Git
+      # ----------------------------------------------------------
+
+      - name: Configure Git
+        shell: powershell
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      # ----------------------------------------------------------
+      # Fetch Latest Main and Feature
+      # ----------------------------------------------------------
+
+      - name: Fetch Branches
+        shell: powershell
+        run: |
+          git fetch origin main
+          git fetch origin feature
+
+      # ----------------------------------------------------------
+      # Merge Feature into Main
+      # ----------------------------------------------------------
+
+      - name: Merge Feature into Main
+        shell: powershell
+        run: |
+          git checkout main
+          git reset --hard origin/main
+
+          git merge origin/feature --no-ff -m "Merge feature into main"
+
+      # ----------------------------------------------------------
+      # Push Main
+      # ----------------------------------------------------------
+
+      - name: Push Main
+        shell: powershell
+        run: |
+          git push origin main
 
 
-      # ------------------------------------------------------
-      # Terraform Version
-      # ------------------------------------------------------
+  # ============================================================
+  # 3. CONTINUOUS DEPLOYMENT
+  # Runs only after successful merge
+  # ============================================================
 
-      - name: Terraform Version
+  terraform-cd:
+    name: Terraform CD
+    runs-on: self-hosted
+
+    needs:
+      - merge-feature-to-main
+
+    if: success()
+
+    steps:
+
+      # ----------------------------------------------------------
+      # Checkout Main
+      # ----------------------------------------------------------
+
+      - name: Checkout Main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      # ----------------------------------------------------------
+      # Check Terraform
+      # ----------------------------------------------------------
+
+      - name: Check Terraform Version
+        shell: powershell
         run: |
           terraform version
 
-
-      # ------------------------------------------------------
+      # ----------------------------------------------------------
       # Azure Login
-      # ------------------------------------------------------
+      # ----------------------------------------------------------
 
       - name: Azure Login
         uses: azure/login@v2
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-
-      # ------------------------------------------------------
+      # ----------------------------------------------------------
       # Verify Azure Login
-      # ------------------------------------------------------
+      # ----------------------------------------------------------
 
       - name: Verify Azure Login
+        shell: powershell
         run: |
           az account show
 
-
-      # ------------------------------------------------------
+      # ----------------------------------------------------------
       # Terraform Init
-      # ------------------------------------------------------
+      # ----------------------------------------------------------
 
       - name: Terraform Init
+        shell: powershell
         working-directory: Environment/prod
         run: |
           terraform init
 
-
-      # ------------------------------------------------------
+      # ----------------------------------------------------------
       # Terraform Validate
-      # ------------------------------------------------------
+      # ----------------------------------------------------------
 
       - name: Terraform Validate
+        shell: powershell
         working-directory: Environment/prod
         run: |
           terraform validate
 
+      # ----------------------------------------------------------
+      # Terraform Plan
+      # ----------------------------------------------------------
 
-      # ------------------------------------------------------
-      # Terraform Apply
-      # ------------------------------------------------------
-
-      - name: Terraform Apply
+      - name: Terraform Plan
+        shell: powershell
         working-directory: Environment/prod
         run: |
-          terraform apply -auto-approve
+          terraform plan -out=tfplan
+
+      # ----------------------------------------------------------
+      # Terraform Apply
+      # ----------------------------------------------------------
+
+      - name: Terraform Apply
+        shell: powershell
+        working-directory: Environment/prod
+        run: |
+          terraform apply -auto-approve tfplan
+
+      # ----------------------------------------------------------
+      # Deployment Complete
+      # ----------------------------------------------------------
+
+      - name: Deployment Complete
+        shell: powershell
+        run: |
+          Write-Host ""
+          Write-Host "=============================================="
+          Write-Host " Terraform CD Completed Successfully"
+          Write-Host " Feature -> Main -> Azure"
+          Write-Host "=============================================="
