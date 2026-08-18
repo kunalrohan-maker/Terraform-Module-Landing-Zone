@@ -11,9 +11,9 @@ permissions:
 
 jobs:
 
-  # ============================================================
+  # ==========================================================
   # 1. CONTINUOUS INTEGRATION
-  # ============================================================
+  # ==========================================================
 
   terraform-ci:
     name: Terraform CI
@@ -25,74 +25,37 @@ jobs:
 
     steps:
 
-      # ----------------------------------------------------------
-      # Checkout Feature Branch
-      # ----------------------------------------------------------
-
       - name: Checkout Feature Branch
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      # ----------------------------------------------------------
-      # Terraform Version
-      # Terraform is already installed on self-hosted runner
-      # ----------------------------------------------------------
-
       - name: Terraform Version
         run: terraform version
-
-      # ----------------------------------------------------------
-      # Azure Login
-      # ----------------------------------------------------------
 
       - name: Azure Login
         uses: azure/login@v2
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-      # ----------------------------------------------------------
-      # Verify Azure Login
-      # ----------------------------------------------------------
-
       - name: Verify Azure Login
         run: az account show
-
-      # ----------------------------------------------------------
-      # Terraform Init
-      # ----------------------------------------------------------
 
       - name: Terraform Init
         working-directory: Environment/prod
         run: terraform init
 
-      # ----------------------------------------------------------
-      # Terraform Format
-      # ----------------------------------------------------------
-
       - name: Terraform Format
         working-directory: Environment/prod
         run: terraform fmt -recursive
-
-      # ----------------------------------------------------------
-      # Terraform Validate
-      # ----------------------------------------------------------
 
       - name: Terraform Validate
         working-directory: Environment/prod
         run: terraform validate
 
-      # ----------------------------------------------------------
-      # Terraform Plan
-      # ----------------------------------------------------------
-
       - name: Terraform Plan
         working-directory: Environment/prod
         run: terraform plan -out=tfplan
-
-      # ----------------------------------------------------------
-      # Upload Terraform Plan
-      # ----------------------------------------------------------
 
       - name: Upload Terraform Plan
         uses: actions/upload-artifact@v4
@@ -101,107 +64,142 @@ jobs:
           path: Environment/prod/tfplan
 
 
-  # ============================================================
-  # 2. CREATE PR + AUTOMATICALLY MERGE FEATURE -> MAIN
-  # ============================================================
+  # ==========================================================
+  # 2. CREATE PR + AUTO MERGE FEATURE -> MAIN
+  # ==========================================================
 
   merge-feature-to-main:
     name: Merge Feature to Main
     runs-on: self-hosted
 
-    needs:
-      - terraform-ci
+    needs: terraform-ci
 
     if: success()
 
-    defaults:
-      run:
-        shell: cmd
-
     steps:
-
-      # ----------------------------------------------------------
-      # Checkout Repository
-      # ----------------------------------------------------------
 
       - name: Checkout Repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      # ----------------------------------------------------------
-      # Configure Git
-      # ----------------------------------------------------------
-
-      - name: Configure Git
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-
-      # ----------------------------------------------------------
-      # Create Pull Request if one does not already exist
-      # ----------------------------------------------------------
+      # -------------------------------------------------------
+      # Create Pull Request
+      # -------------------------------------------------------
 
       - name: Create Pull Request
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          for /f "delims=" %%i in ('gh pr list --base main --head feature --state open --json number --jq ".[0].number"') do set PR_NUMBER=%%i
+        id: create-pr
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
 
-          if "%PR_NUMBER%"=="" (
-            echo No open PR found. Creating PR...
+            // Check if an open PR already exists
+            const existingPRs = await github.rest.pulls.list({
+              owner,
+              repo,
+              head: `${owner}:feature`,
+              base: 'main',
+              state: 'open'
+            });
 
-            gh pr create ^
-              --base main ^
-              --head feature ^
-              --title "Feature to Main - Terraform CI Passed" ^
-              --body "Terraform CI completed successfully. Automatically created by GitHub Actions."
+            let prNumber;
 
-          ) else (
-            echo Existing PR found: #%PR_NUMBER%
-          )
+            if (existingPRs.data.length > 0) {
 
-      # ----------------------------------------------------------
+              prNumber = existingPRs.data[0].number;
+
+              core.info(`Existing PR found: #${prNumber}`);
+
+            } else {
+
+              const pr = await github.rest.pulls.create({
+                owner,
+                repo,
+                title: 'Feature to Main - Terraform CI Passed',
+                head: 'feature',
+                base: 'main',
+                body: [
+                  '## Terraform CI Passed',
+                  '',
+                  'The Terraform CI pipeline completed successfully.',
+                  '',
+                  '- Terraform Init',
+                  '- Terraform Format',
+                  '- Terraform Validate',
+                  '- Terraform Plan',
+                  '',
+                  'This PR was created automatically by GitHub Actions.'
+                ].join('\n')
+              });
+
+              prNumber = pr.data.number;
+
+              core.info(`Created PR #${prNumber}`);
+            }
+
+            core.setOutput('pr_number', prNumber.toString());
+
+
+      # -------------------------------------------------------
       # Merge Pull Request
-      # ----------------------------------------------------------
+      # -------------------------------------------------------
 
       - name: Merge Pull Request
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          for /f "delims=" %%i in ('gh pr list --base main --head feature --state open --json number --jq ".[0].number"') do set PR_NUMBER=%%i
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
 
-          if "%PR_NUMBER%"=="" (
-            echo ERROR: Pull Request not found.
-            exit /b 1
-          )
+            // Find the open PR
+            const prs = await github.rest.pulls.list({
+              owner,
+              repo,
+              head: `${owner}:feature`,
+              base: 'main',
+              state: 'open'
+            });
 
-          echo Merging Pull Request #%PR_NUMBER%
+            if (prs.data.length === 0) {
+              core.setFailed('No open Pull Request found from feature to main.');
+              return;
+            }
 
-          gh pr merge %PR_NUMBER% ^
-            --merge ^
-            --delete-branch=false ^
-            --subject "Merge feature into main" ^
-            --body "Automatically merged after successful Terraform CI."
+            const prNumber = prs.data[0].number;
 
-          if errorlevel 1 (
-            echo ERROR: Pull Request merge failed.
-            exit /b 1
-          )
+            core.info(`Merging PR #${prNumber}`);
 
-          echo Feature successfully merged into main.
+            const result = await github.rest.pulls.merge({
+              owner,
+              repo,
+              pull_number: prNumber,
+              merge_method: 'merge',
+              commit_title: 'Merge feature into main',
+              commit_message: 'Automatically merged after successful Terraform CI.'
+            });
+
+            if (!result.data.merged) {
+              core.setFailed(
+                `PR #${prNumber} was not merged. Message: ${result.data.message}`
+              );
+            } else {
+              core.info(`PR #${prNumber} merged successfully.`);
+            }
 
 
-  # ============================================================
+  # ==========================================================
   # 3. CONTINUOUS DEPLOYMENT
-  # ============================================================
+  # ==========================================================
 
   terraform-cd:
     name: Terraform CD
     runs-on: self-hosted
 
-    needs:
-      - merge-feature-to-main
+    needs: merge-feature-to-main
 
     if: success()
 
@@ -210,10 +208,6 @@ jobs:
         shell: cmd
 
     steps:
-
-      # ----------------------------------------------------------
-      # Checkout MAIN after successful merge
-      # ----------------------------------------------------------
 
       - name: Checkout Main
         uses: actions/checkout@v4
@@ -221,73 +215,37 @@ jobs:
           ref: main
           fetch-depth: 0
 
-      # ----------------------------------------------------------
-      # Verify branch
-      # ----------------------------------------------------------
-
       - name: Verify Main Branch
         run: |
           git branch --show-current
           git log -1 --oneline
 
-      # ----------------------------------------------------------
-      # Terraform Version
-      # ----------------------------------------------------------
-
       - name: Terraform Version
         run: terraform version
-
-      # ----------------------------------------------------------
-      # Azure Login
-      # ----------------------------------------------------------
 
       - name: Azure Login
         uses: azure/login@v2
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-      # ----------------------------------------------------------
-      # Verify Azure Login
-      # ----------------------------------------------------------
-
       - name: Verify Azure Login
         run: az account show
-
-      # ----------------------------------------------------------
-      # Terraform Init
-      # ----------------------------------------------------------
 
       - name: Terraform Init
         working-directory: Environment/prod
         run: terraform init
 
-      # ----------------------------------------------------------
-      # Terraform Validate
-      # ----------------------------------------------------------
-
       - name: Terraform Validate
         working-directory: Environment/prod
         run: terraform validate
-
-      # ----------------------------------------------------------
-      # Terraform Plan
-      # ----------------------------------------------------------
 
       - name: Terraform Plan
         working-directory: Environment/prod
         run: terraform plan -out=tfplan
 
-      # ----------------------------------------------------------
-      # Terraform Apply
-      # ----------------------------------------------------------
-
       - name: Terraform Apply
         working-directory: Environment/prod
         run: terraform apply -auto-approve tfplan
-
-      # ----------------------------------------------------------
-      # Deployment Complete
-      # ----------------------------------------------------------
 
       - name: Deployment Complete
         run: |
