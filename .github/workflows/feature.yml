@@ -25,47 +25,75 @@ jobs:
 
     steps:
 
-      # Checkout feature branch
-      - name: Checkout Repository
+      # ----------------------------------------------------------
+      # Checkout Feature Branch
+      # ----------------------------------------------------------
+
+      - name: Checkout Feature Branch
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
+      # ----------------------------------------------------------
+      # Terraform Version
       # Terraform is already installed on self-hosted runner
+      # ----------------------------------------------------------
+
       - name: Terraform Version
         run: terraform version
 
+      # ----------------------------------------------------------
       # Azure Login
+      # ----------------------------------------------------------
+
       - name: Azure Login
         uses: azure/login@v2
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
+      # ----------------------------------------------------------
       # Verify Azure Login
+      # ----------------------------------------------------------
+
       - name: Verify Azure Login
         run: az account show
 
+      # ----------------------------------------------------------
       # Terraform Init
+      # ----------------------------------------------------------
+
       - name: Terraform Init
         working-directory: Environment/prod
         run: terraform init
 
+      # ----------------------------------------------------------
       # Terraform Format
+      # ----------------------------------------------------------
+
       - name: Terraform Format
         working-directory: Environment/prod
         run: terraform fmt -recursive
 
+      # ----------------------------------------------------------
       # Terraform Validate
+      # ----------------------------------------------------------
+
       - name: Terraform Validate
         working-directory: Environment/prod
         run: terraform validate
 
+      # ----------------------------------------------------------
       # Terraform Plan
+      # ----------------------------------------------------------
+
       - name: Terraform Plan
         working-directory: Environment/prod
         run: terraform plan -out=tfplan
 
-      # Upload plan
+      # ----------------------------------------------------------
+      # Upload Terraform Plan
+      # ----------------------------------------------------------
+
       - name: Upload Terraform Plan
         uses: actions/upload-artifact@v4
         with:
@@ -74,92 +102,94 @@ jobs:
 
 
   # ============================================================
-  # 2. CREATE PR AND MERGE FEATURE -> MAIN
+  # 2. CREATE PR + AUTOMATICALLY MERGE FEATURE -> MAIN
   # ============================================================
 
   merge-feature-to-main:
     name: Merge Feature to Main
     runs-on: self-hosted
 
-    defaults:
-      run:
-        shell: cmd
-
     needs:
       - terraform-ci
 
     if: success()
 
+    defaults:
+      run:
+        shell: cmd
+
     steps:
+
+      # ----------------------------------------------------------
+      # Checkout Repository
+      # ----------------------------------------------------------
 
       - name: Checkout Repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      # --------------------------------------------------------
-      # Create Pull Request
-      # --------------------------------------------------------
+      # ----------------------------------------------------------
+      # Configure Git
+      # ----------------------------------------------------------
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      # ----------------------------------------------------------
+      # Create Pull Request if one does not already exist
+      # ----------------------------------------------------------
 
       - name: Create Pull Request
-        shell: powershell
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          $prNumber = gh pr list `
-            --base main `
-            --head feature `
-            --state open `
-            --json number `
-            --jq '.[0].number'
+          for /f "delims=" %%i in ('gh pr list --base main --head feature --state open --json number --jq ".[0].number"') do set PR_NUMBER=%%i
 
-          if ([string]::IsNullOrWhiteSpace($prNumber)) {
+          if "%PR_NUMBER%"=="" (
+            echo No open PR found. Creating PR...
 
-            Write-Host "Creating Pull Request..."
-
-            gh pr create `
-              --base main `
-              --head feature `
-              --title "Feature to Main - Terraform CI Passed" `
+            gh pr create ^
+              --base main ^
+              --head feature ^
+              --title "Feature to Main - Terraform CI Passed" ^
               --body "Terraform CI completed successfully. Automatically created by GitHub Actions."
 
-          }
-          else {
+          ) else (
+            echo Existing PR found: #%PR_NUMBER%
+          )
 
-            Write-Host "Pull Request already exists: #$prNumber"
-
-          }
-
-      # --------------------------------------------------------
+      # ----------------------------------------------------------
       # Merge Pull Request
-      # --------------------------------------------------------
+      # ----------------------------------------------------------
 
       - name: Merge Pull Request
-        shell: powershell
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          for /f "delims=" %%i in ('gh pr list --base main --head feature --state open --json number --jq ".[0].number"') do set PR_NUMBER=%%i
 
-          $prNumber = gh pr list `
-            --base main `
-            --head feature `
-            --state open `
-            --json number `
-            --jq '.[0].number'
+          if "%PR_NUMBER%"=="" (
+            echo ERROR: Pull Request not found.
+            exit /b 1
+          )
 
-          if ([string]::IsNullOrWhiteSpace($prNumber)) {
+          echo Merging Pull Request #%PR_NUMBER%
 
-            Write-Error "Pull Request was not found."
+          gh pr merge %PR_NUMBER% ^
+            --merge ^
+            --delete-branch=false ^
+            --subject "Merge feature into main" ^
+            --body "Automatically merged after successful Terraform CI."
 
-          }
+          if errorlevel 1 (
+            echo ERROR: Pull Request merge failed.
+            exit /b 1
+          )
 
-          Write-Host "Merging Pull Request #$prNumber"
-
-          gh pr merge $prNumber `
-            --merge `
-            --delete-branch=false
-
-          Write-Host "Feature branch merged into main successfully."
+          echo Feature successfully merged into main.
 
 
   # ============================================================
@@ -170,20 +200,20 @@ jobs:
     name: Terraform CD
     runs-on: self-hosted
 
-    defaults:
-      run:
-        shell: cmd
-
     needs:
       - merge-feature-to-main
 
     if: success()
 
+    defaults:
+      run:
+        shell: cmd
+
     steps:
 
-      # --------------------------------------------------------
+      # ----------------------------------------------------------
       # Checkout MAIN after successful merge
-      # --------------------------------------------------------
+      # ----------------------------------------------------------
 
       - name: Checkout Main
         uses: actions/checkout@v4
@@ -191,64 +221,77 @@ jobs:
           ref: main
           fetch-depth: 0
 
-      # --------------------------------------------------------
-      # Verify Terraform
-      # --------------------------------------------------------
+      # ----------------------------------------------------------
+      # Verify branch
+      # ----------------------------------------------------------
+
+      - name: Verify Main Branch
+        run: |
+          git branch --show-current
+          git log -1 --oneline
+
+      # ----------------------------------------------------------
+      # Terraform Version
+      # ----------------------------------------------------------
 
       - name: Terraform Version
         run: terraform version
 
-      # --------------------------------------------------------
+      # ----------------------------------------------------------
       # Azure Login
-      # --------------------------------------------------------
+      # ----------------------------------------------------------
 
       - name: Azure Login
         uses: azure/login@v2
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-      # --------------------------------------------------------
+      # ----------------------------------------------------------
       # Verify Azure Login
-      # --------------------------------------------------------
+      # ----------------------------------------------------------
 
       - name: Verify Azure Login
         run: az account show
 
-      # --------------------------------------------------------
+      # ----------------------------------------------------------
       # Terraform Init
-      # --------------------------------------------------------
+      # ----------------------------------------------------------
 
       - name: Terraform Init
         working-directory: Environment/prod
         run: terraform init
 
-      # --------------------------------------------------------
+      # ----------------------------------------------------------
       # Terraform Validate
-      # --------------------------------------------------------
+      # ----------------------------------------------------------
 
       - name: Terraform Validate
         working-directory: Environment/prod
         run: terraform validate
 
-      # --------------------------------------------------------
+      # ----------------------------------------------------------
       # Terraform Plan
-      # --------------------------------------------------------
+      # ----------------------------------------------------------
 
       - name: Terraform Plan
         working-directory: Environment/prod
         run: terraform plan -out=tfplan
 
-      # --------------------------------------------------------
+      # ----------------------------------------------------------
       # Terraform Apply
-      # --------------------------------------------------------
+      # ----------------------------------------------------------
 
       - name: Terraform Apply
         working-directory: Environment/prod
         run: terraform apply -auto-approve tfplan
 
-      # --------------------------------------------------------
+      # ----------------------------------------------------------
       # Deployment Complete
-      # --------------------------------------------------------
+      # ----------------------------------------------------------
 
       - name: Deployment Complete
-        run: echo Terraform CD completed successfully.
+        run: |
+          echo ==========================================
+          echo Terraform CD Completed Successfully
+          echo Feature -^> Main -^> Azure
+          echo ==========================================
