@@ -9,11 +9,12 @@ RG = {
     loc     = "Australia east"
     managed = "Kunal"
   }
-RG3 = {
-name    = "Dev_Test"
+
+    RG3 = {
+    name    = "Dev_Kunal1"
     loc     = "Australia east"
     managed = "Kunal"
-
+  }
 }
 
 VNET = {

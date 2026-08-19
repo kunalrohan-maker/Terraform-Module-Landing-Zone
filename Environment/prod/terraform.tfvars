@@ -9,11 +9,6 @@ RG = {
     loc     = "Australia east"
     managed = "Kunal"
   }
-    RG3 = {
-    name    = "Prod_Test"
-    loc     = "Australia east"
-    managed = "Ashish"
-  }
 }
 
 VNET = {
@@ -58,9 +53,9 @@ NAT_pip = {
 }
 
 NSG = {
-  NSG1 = {name = "NSG_Frontend", loc = "Japaneast", res = "Prod_Rohan", name_security_rule = "DevOps", priority = 100,direction = "Inbound", access = "Allow",
+  NSG1 = {name = "NSG_Frontend", loc = "Japaneast", res = "Prod_Rohan", name_security_rule = "ProdOps", priority = 100,direction = "Inbound", access = "Allow",
     protocol = "Tcp",destination_port_range  = "22"}
-  NSG2 = {name = "NSG_Backend", loc = "Japaneast", res = "Prod_Rohan", name_security_rule = "DevOps", priority = 100,direction = "Inbound", access = "Allow",
+  NSG2 = {name = "NSG_Backend", loc = "Japaneast", res = "Prod_Rohan", name_security_rule = "ProdOps", priority = 100,direction = "Inbound", access = "Allow",
     protocol = "Tcp",destination_port_range  = "22"}  
 }
 
