@@ -19,11 +19,23 @@ jobs:
     name: Terraform CI
     runs-on: self-hosted
 
+    env:
+      AZURE_CONFIG_DIR: ${{ runner.temp }}\azure-cli-clean
+
     defaults:
       run:
         shell: cmd
 
     steps:
+
+      # --------------------------------------------------------
+      # Prepare fresh Azure CLI configuration
+      # --------------------------------------------------------
+
+      - name: Prepare Azure CLI Config
+        run: |
+          if exist "%AZURE_CONFIG_DIR%" rmdir /s /q "%AZURE_CONFIG_DIR%"
+          mkdir "%AZURE_CONFIG_DIR%"
 
       # --------------------------------------------------------
       # Checkout Feature Branch
@@ -36,7 +48,7 @@ jobs:
 
       # --------------------------------------------------------
       # Terraform Version
-      # Terraform is already installed on self-hosted runner
+      # Terraform is already installed on the self-hosted runner
       # --------------------------------------------------------
 
       - name: Terraform Version
@@ -131,7 +143,6 @@ jobs:
       # --------------------------------------------------------
 
       - name: Create Pull Request
-        id: create-pr
         uses: actions/github-script@v7
         with:
           github-token: ${{ github.token }}
@@ -141,10 +152,9 @@ jobs:
             const repo = context.repo.repo;
 
             core.info(`Repository: ${owner}/${repo}`);
-            core.info(`Source: feature`);
-            core.info(`Target: main`);
+            core.info(`Creating/checking PR: feature -> main`);
 
-            // Check whether an open PR already exists
+            // Check if an open PR already exists
             const existingPRs = await github.rest.pulls.list({
               owner,
               repo,
@@ -157,12 +167,11 @@ jobs:
               const prNumber = existingPRs.data[0].number;
 
               core.info(`Existing PR found: #${prNumber}`);
-
               core.setOutput("pr_number", prNumber.toString());
               return;
             }
 
-            // Create PR
+            // Create PR body
             const prBody = [
               "## Terraform CI Passed",
               "",
@@ -177,6 +186,7 @@ jobs:
               "This Pull Request was created automatically by GitHub Actions."
             ].join("\n");
 
+            // Create Pull Request
             const pr = await github.rest.pulls.create({
               owner,
               repo,
@@ -187,15 +197,14 @@ jobs:
             });
 
             core.info(`Pull Request created: #${pr.data.number}`);
-
             core.setOutput("pr_number", pr.data.number.toString());
 
 
       # --------------------------------------------------------
-      # Wait for PR to become mergeable
+      # Wait until GitHub calculates PR mergeability
       # --------------------------------------------------------
 
-      - name: Wait for Pull Request
+      - name: Check Pull Request Mergeability
         uses: actions/github-script@v7
         with:
           github-token: ${{ github.token }}
@@ -219,11 +228,9 @@ jobs:
 
             const prNumber = prs.data[0].number;
 
-            core.info(`Checking merge status of PR #${prNumber}`);
+            core.info(`Checking PR #${prNumber}`);
 
-            let mergeable = null;
-
-            for (let attempt = 1; attempt <= 10; attempt++) {
+            for (let attempt = 1; attempt <= 12; attempt++) {
 
               const pr = await github.rest.pulls.get({
                 owner,
@@ -231,26 +238,24 @@ jobs:
                 pull_number: prNumber
               });
 
-              mergeable = pr.data.mergeable;
-              const mergeableState = pr.data.mergeable_state;
-
               core.info(
-                `Attempt ${attempt}: mergeable=${mergeable}, state=${mergeableState}`
+                `Attempt ${attempt}: mergeable=${pr.data.mergeable}, state=${pr.data.mergeable_state}`
               );
 
-              if (mergeable === true) {
-                core.info("Pull Request is mergeable.");
+              if (pr.data.mergeable === true) {
+                core.info("PR is mergeable.");
                 return;
               }
 
-              if (mergeable === false) {
+              if (pr.data.mergeable === false) {
                 core.setFailed(
-                  `Pull Request is not mergeable. State: ${mergeableState}`
+                  `PR is not mergeable. GitHub state: ${pr.data.mergeable_state}`
                 );
                 return;
               }
 
-              // GitHub may return null while calculating mergeability
+              // GitHub may temporarily return null
+              // while calculating mergeability.
               await new Promise(resolve => setTimeout(resolve, 5000));
             }
 
@@ -281,13 +286,15 @@ jobs:
             });
 
             if (prs.data.length === 0) {
-              core.setFailed("No open Pull Request found from feature to main.");
+              core.setFailed(
+                "No open Pull Request found from feature to main."
+              );
               return;
             }
 
             const prNumber = prs.data[0].number;
 
-            core.info(`Attempting to merge Pull Request #${prNumber}`);
+            core.info(`Merging PR #${prNumber}`);
 
             const result = await github.rest.pulls.merge({
               owner,
@@ -295,7 +302,8 @@ jobs:
               pull_number: prNumber,
               merge_method: "merge",
               commit_title: "Merge feature into main",
-              commit_message: "Automatically merged after successful Terraform CI."
+              commit_message:
+                "Automatically merged after successful Terraform CI."
             });
 
             if (!result.data.merged) {
@@ -305,8 +313,9 @@ jobs:
               return;
             }
 
-            core.info(`Pull Request #${prNumber} merged successfully.`);
-            core.info(`SHA: ${result.data.sha}`);
+            core.info(
+              `PR #${prNumber} merged successfully. SHA: ${result.data.sha}`
+            );
 
 
   # ==========================================================
@@ -322,6 +331,9 @@ jobs:
 
     if: success()
 
+    env:
+      AZURE_CONFIG_DIR: ${{ runner.temp }}\azure-cli-clean
+
     defaults:
       run:
         shell: cmd
@@ -329,7 +341,16 @@ jobs:
     steps:
 
       # --------------------------------------------------------
-      # Checkout MAIN
+      # Prepare fresh Azure CLI configuration
+      # --------------------------------------------------------
+
+      - name: Prepare Azure CLI Config
+        run: |
+          if exist "%AZURE_CONFIG_DIR%" rmdir /s /q "%AZURE_CONFIG_DIR%"
+          mkdir "%AZURE_CONFIG_DIR%"
+
+      # --------------------------------------------------------
+      # Checkout Main
       # --------------------------------------------------------
 
       - name: Checkout Main
