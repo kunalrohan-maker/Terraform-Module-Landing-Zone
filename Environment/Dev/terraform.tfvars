@@ -78,8 +78,8 @@ NIC = {
   disable_password_authentication = false, caching = "ReadWrite", storage_account_type = "Standard_LRS", publisher = "Canonical", offer = "UbuntuServer",
   sku = "16.04-LTS", version = "latest", NIC_id = "NIC2"}
 
-  
  }
+
 
  lb = {
   lb1 = { name = "LoadBalancer",loc = "Japaneast", res= "Dev_Rohan", frontendIP_config = "Frontend_IP", public_ip_address_id = "pip3"}
@@ -94,10 +94,10 @@ NIC = {
  }
 
  bass = {
-  bass1 = { name = "NIC_Backend_Association", NIC_id = "NIC1", pool_id = "pool1"}
-  bass2 = { name = "NIC_Backend_Association", NIC_id = "NIC2", pool_id = "pool1"}
+  bass1 = { IP_name = "frontend_privateIP", NIC_id = "NIC1", pool_id = "pool1"}
+  bass2 = { IP_name = "backend_privateIP", NIC_id = "NIC2", pool_id = "pool1"}
  }
 
  rule = {
-  rule1 = {name = "HTTP", proto = "Tcp", frontendIP_config = "FrontendIP", pool_id = "pool1", probe_id = "h1", lb_id = "lb1"}
+  rule1 = {name = "HTTP", proto = "Tcp", frontendIP_config = "LB_IP", pool_id = "pool1", probe_id = "h1", lb_id = "lb1"}
  }
