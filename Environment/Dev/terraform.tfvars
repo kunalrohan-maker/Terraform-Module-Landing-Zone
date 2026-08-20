@@ -71,10 +71,10 @@ NIC = {
  }
 
  VM = {
-  VM1 = {name = "frontendVM",res = "Dev_Rohan",loc = "Japaneast",size = "Standard_D2s_v3",admin_username = "test123456", admin_password = "Test_123456789",
+  VM1 = {name = "frontendVM",res = "Dev_Rohan",loc = "Japaneast",size = "Standard_D2as_v5",admin_username = "test123456", admin_password = "Test_123456789",
   disable_password_authentication = false, caching = "ReadWrite", storage_account_type = "Standard_LRS", publisher = "Canonical", offer = "UbuntuServer",
   sku = "16.04-LTS", version = "latest", NIC_id = "NIC1"}
-  VM2 = {name = "backendVM",res = "Dev_Rohan",loc = "Japaneast",size = "Standard_D2s_v3",admin_username = "test123456", admin_password = "Test_123456789",
+  VM2 = {name = "backendVM",res = "Dev_Rohan",loc = "Japaneast",size = "Standard_D2as_v5",admin_username = "test123456", admin_password = "Test_123456789",
   disable_password_authentication = false, caching = "ReadWrite", storage_account_type = "Standard_LRS", publisher = "Canonical", offer = "UbuntuServer",
   sku = "16.04-LTS", version = "latest", NIC_id = "NIC2"}
 

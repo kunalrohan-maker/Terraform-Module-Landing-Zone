@@ -12,7 +12,7 @@ data "azurerm_lb" "lb" {
 
 resource "azurerm_network_interface_backend_address_pool_association" "bass" {
   network_interface_id    = data.azurerm_network_interface.NIC[each.value.NIC_id].id
-  ip_configuration_name   = each.value.name
+  ip_configuration_name   = each.value.IP_name
   backend_address_pool_id = azurerm_lb_backend_address_pool.backendpool[each.value.pool_id].id
   for_each = var.bass
 }

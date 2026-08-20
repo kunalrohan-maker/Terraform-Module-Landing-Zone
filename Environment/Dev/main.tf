@@ -90,7 +90,7 @@ module "Backend" {
   bass = var.bass
   lb = var.lb
   NIC = var.NIC
-  depends_on = [ module.lb ]
+  depends_on = [ module.lb, module.NIC ]
   
 }
 
